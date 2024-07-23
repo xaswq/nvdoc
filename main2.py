@@ -1,6 +1,6 @@
 # from __future__ import print_function
 from models import NvDoc
-from dataset4 import Dataset
+from dataset import Dataset
 
 import argparse
 import random
@@ -110,26 +110,12 @@ def train(train_dataloader, net, optimizer, epoch, device, logger, scheduler, op
         im = im.to(device)
         bm_gt = bm_gt.to(device)
 
-        # # 修改这里以支持批量处理
-        # batch_size = im.size(0)
-        # batch_images = [[img] for img in im]
-        # bm_pred = net(batch_images)
-
-        # # 确保 bm_pred 和 bm_gt 的形状匹配
-        # if isinstance(bm_pred, list):
-        #     bm_pred = torch.stack(bm_pred)
-
         #print(im.shape, bm_gt.shape)
-        bm_pred = net([ [ im.squeeze(0) ] ])
+        bm_pred = net(im)
         #print(bm_pred.shape, bm_pred.dtype)
-
-
-
         loss = (bm_pred - bm_gt).abs().mean()
 
         reduced_loss = reduce_tensor(loss)
-        # if opt.local_rank == 0 :
-        #     print('reduced_loss',reduced_loss)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.module.parameters(), opt.clip) #打开
         optimizer.step()
@@ -160,7 +146,7 @@ def main():
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument('--world_size', default=0)
     parser.add_argument('--workers', type=int, default=12)
-    parser.add_argument('--batchSize', type=int, default=1)#change to 1
+    parser.add_argument('--batchSize', type=int, default=1) #change to 1
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--net_if_need_pretrained', default=False)
     parser.add_argument('--net_trained_path', default=root_path + 'save/net/epoch_16.pth')
@@ -220,7 +206,7 @@ def main():
     # net
     device = torch.device('cuda:{}'.format(opt.local_rank))  # torch.device("cuda:0")
     torch.cuda.set_device(opt.local_rank)
-    model = NvDoc(   
+    model =  NvDoc(
     image_size = 256,
     patch_size = 16,
     num_classes = 1000,
@@ -230,7 +216,8 @@ def main():
     dropout=0.1,
     emb_dropout=0.1,
     token_dropout_prob=0,
-    depth=8)
+    depth=8
+)
     if opt.local_rank == 0:
         print(get_parameter_number(model))
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
